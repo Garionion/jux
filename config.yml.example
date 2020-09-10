@@ -1,0 +1,5 @@
+xmpp:
+  address:  "localhost:5222"
+  domain:   ""
+  jid:      ""
+  password: ""
