@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/gofiber/cors"
-	"github.com/gofiber/fiber"
-	"github.com/gofiber/websocket"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 	"github.com/google/uuid"
 	"github.com/ilyakaznacheev/cleanenv"
 	"gosrc.io/xmpp"
@@ -84,19 +84,20 @@ func main() {
 	app.Use(cors.New())
 
 	//TODO use Ctrl Message via websocket to create new connection
-	app.Post("/newConnection", func(c *fiber.Ctx) {
+	app.Post("/newConnection", func(c *fiber.Ctx) error {
 		id :=  clientHandler(&xmppConfig)
 		log.Println("Got ID: ", id)
-		c.SendString(id)
+		return c.SendString(id)
 	})
 
-	app.Use(func(c *fiber.Ctx) {
+	app.Use("/ws", func(c *fiber.Ctx) error {
 		// IsWebSocketUpgrade returns true if the client
 		// requested upgrade to the WebSocket protocol.
 		if websocket.IsWebSocketUpgrade(c) {
 			c.Locals("allowed", true)
-			c.Next()
+			return c.Next()
 		}
+		return fiber.ErrUpgradeRequired
 	})
 
 	app.Get("/ws/:id", websocket.New(func(c *websocket.Conn) {
@@ -120,6 +121,7 @@ func main() {
 						//TODO log last connection
 						break
 					}
+					//TODO detect normal closed connection
 					continue
 				}
 				client.sendChannel <- message
@@ -137,7 +139,7 @@ func main() {
 	}))
 
 
-	log.Fatal(app.Listen(3000))
+	log.Fatal(app.Listen(":3000"))
 }
 
 func genID() string {
@@ -158,7 +160,7 @@ func clientHandler(config *xmpp.Config) string {
 	router.HandleFunc("message", func (s xmpp.Sender, p stanza.Packet) {
 		msg, ok := p.(stanza.Message)
 		if !ok {
-			log.Fatalf("Ignoring packet: %T\n", p)
+			log.Printf("Ignoring packet: %T\n", p)
 			return
 		}
 		//TODO extract username
